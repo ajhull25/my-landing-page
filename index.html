@@ -885,7 +885,7 @@
         const commercial = approaching.filter(s => /^[A-Z]{2,3}\d+$/.test(s[1].trim()));
         for (const s of commercial) {
           try {
-            const r = await fetch(`https://opensky-network.org/api/metadata/aircraft/icao/${s[0]}`);
+            const r = await fetch(`/proxy/aircraft/${s[0]}`);
             const d = await r.json();
             typeMap[s[0]] = { typecode: d.typecode || null, model: d.model || null };
           } catch (_) {}
@@ -919,10 +919,8 @@
 
     async function loadFlightsSchedule() {
       try {
-        const apiUrl = `http://api.aviationstack.com/v1/flights?access_key=${AVIATION_KEY}&arr_iata=AUS&flight_status=active&limit=10`;
-        const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(apiUrl)}`);
-        const wrapper = await res.json();
-        const data = JSON.parse(wrapper.contents);
+        const res = await fetch('/proxy/aus-flights');
+        const data = await res.json();
         const flights = (data.data || [])
           .filter(f => f.airline?.name && f.airline.name !== 'empty' && f.departure?.iata)
           .slice(0, 8);
