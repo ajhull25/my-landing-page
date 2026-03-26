@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Alex Hull</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background-color: #0f0f0f;
+      color: #e0e0e0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 60px 20px 60px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 48px;
+    }
+
+    header h1 {
+      font-size: 2.4rem;
+      font-weight: 700;
+      color: #ffffff;
+      letter-spacing: -0.5px;
+    }
+
+    header p {
+      font-size: 1rem;
+      color: #888;
+      margin-top: 8px;
+    }
+
+    .section-label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #555;
+      margin-bottom: 12px;
+    }
+
+    /* ── Top two-column grid ── */
+    .top-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      width: 100%;
+      max-width: 820px;
+      margin-bottom: 24px;
+    }
+
+    .links {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .links a {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      background-color: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 12px;
+      padding: 14px 18px;
+      text-decoration: none;
+      color: #e0e0e0;
+      font-size: 0.95rem;
+      font-weight: 500;
+      transition: background-color 0.15s, border-color 0.15s;
+    }
+
+    .links a:hover {
+      background-color: #242424;
+      border-color: #3a3a3a;
+    }
+
+    .links a .icon {
+      font-size: 1.2rem;
+      width: 26px;
+      text-align: center;
+    }
+
+    .ticker-widget {
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid #2a2a2a;
+    }
+
+    /* ── Longhorns section ── */
+    .longhorns {
+      width: 100%;
+      max-width: 820px;
+    }
+
+    .longhorns-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .longhorns-header .burned-orange {
+      color: #bf5700;
+      font-size: 1.1rem;
+      font-weight: 700;
+    }
+
+    .longhorns-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 16px;
+    }
+
+    .card {
+      background-color: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 12px;
+      padding: 18px;
+    }
+
+    .card-title {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #555;
+      margin-bottom: 10px;
+    }
+
+    .record-big {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #fff;
+      line-height: 1;
+    }
+
+    .record-sub {
+      font-size: 0.8rem;
+      color: #666;
+      margin-top: 6px;
+    }
+
+    .next-game-opponent {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: 6px;
+    }
+
+    .next-game-detail {
+      font-size: 0.82rem;
+      color: #888;
+      line-height: 1.6;
+    }
+
+    .next-game-detail span.highlight {
+      color: #bf5700;
+      font-weight: 600;
+    }
+
+    /* Standings table */
+    .standings-card {
+      grid-column: span 3;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+
+    thead th {
+      text-align: left;
+      color: #555;
+      font-weight: 500;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 0 8px 10px 0;
+    }
+
+    thead th:not(:first-child) {
+      text-align: center;
+    }
+
+    tbody tr {
+      border-top: 1px solid #222;
+    }
+
+    tbody td {
+      padding: 8px 8px 8px 0;
+      color: #ccc;
+    }
+
+    tbody td:not(:first-child) {
+      text-align: center;
+      color: #888;
+    }
+
+    tbody tr.is-texas td {
+      color: #fff;
+      font-weight: 600;
+    }
+
+    tbody tr.is-texas td:first-child {
+      color: #bf5700;
+    }
+
+    .loading {
+      color: #555;
+      font-size: 0.85rem;
+      padding: 8px 0;
+    }
+
+    .error {
+      color: #666;
+      font-size: 0.82rem;
+    }
+
+    /* ── News section ── */
+    .news-section {
+      width: 100%;
+      max-width: 820px;
+      margin-top: 24px;
+    }
+
+    .news-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+    }
+
+    .news-card {
+      background-color: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 12px;
+      padding: 16px;
+      text-decoration: none;
+      color: #e0e0e0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      transition: background-color 0.15s, border-color 0.15s;
+    }
+
+    .news-card:hover {
+      background-color: #242424;
+      border-color: #3a3a3a;
+    }
+
+    .news-source {
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #555;
+    }
+
+    .news-title {
+      font-size: 0.88rem;
+      font-weight: 500;
+      color: #ddd;
+      line-height: 1.4;
+    }
+
+    .news-date {
+      font-size: 0.75rem;
+      color: #555;
+      margin-top: auto;
+    }
+
+    @media (max-width: 700px) {
+      .top-grid, .longhorns-grid, .news-grid {
+        grid-template-columns: 1fr;
+      }
+      .standings-card {
+        grid-column: span 1;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>Alex Hull</h1>
+    <p>Links & Stuff</p>
+  </header>
+
+  <!-- Links + Markets -->
+  <div class="top-grid">
+    <div>
+      <p class="section-label">Links</p>
+      <div class="links">
+        <a href="https://github.com/dashboard" target="_blank" rel="noopener">
+          <span class="icon">🐙</span> GitHub
+        </a>
+        <a href="https://mail.yahoo.com/d/folders/1" target="_blank" rel="noopener">
+          <span class="icon">📬</span> Yahoo Mail
+        </a>
+        <a href="https://www.linkedin.com/" target="_blank" rel="noopener">
+          <span class="icon">💼</span> LinkedIn
+        </a>
+        <a href="https://discord.com/channels/1486482986760409098/1486482992540029041" target="_blank" rel="noopener">
+          <span class="icon">💬</span> Discord
+        </a>
+        <a href="https://us.etrade.com/etx/hw/v2/accountshome" target="_blank" rel="noopener">
+          <span class="icon">📈</span> E*Trade
+        </a>
+      </div>
+    </div>
+
+    <div>
+      <p class="section-label">Markets</p>
+      <div class="ticker-widget">
+        <div class="tradingview-widget-container">
+          <div class="tradingview-widget-container__widget"></div>
+          <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-market-quotes.js" async>
+          {
+            "width": "100%",
+            "height": 280,
+            "symbolsGroups": [
+              {
+                "name": "Watchlist",
+                "symbols": [
+                  { "name": "NASDAQ:TMC", "displayName": "TMC" },
+                  { "name": "BITSTAMP:BTCUSD", "displayName": "Bitcoin" },
+                  { "name": "NASDAQ:AAPL", "displayName": "Apple" }
+                ]
+              }
+            ],
+            "colorTheme": "dark",
+            "isTransparent": true,
+            "locale": "en"
+          }
+          </script>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Longhorns Baseball -->
+  <div class="longhorns">
+    <div class="longhorns-header">
+      <p class="section-label" style="margin-bottom:0">🤘 Texas Longhorns Baseball <span id="team-ranking" style="color:#bf5700"></span></p>
+    </div>
+    <div class="longhorns-grid">
+
+      <div class="card" id="record-card">
+        <div class="card-title">Record</div>
+        <div class="loading">Loading...</div>
+      </div>
+
+      <div class="card" id="next-game-card">
+        <div class="card-title">Next Game</div>
+        <div class="loading">Loading...</div>
+      </div>
+
+      <div class="card" id="last-game-card">
+        <div class="card-title">Last Result</div>
+        <div class="loading">Loading...</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- News -->
+  <div class="news-section">
+    <p class="section-label">Today's News</p>
+    <div class="news-grid" id="news-grid">
+      <div class="card" style="grid-column:span 3;color:#555;font-size:.85rem">Loading...</div>
+    </div>
+  </div>
+
+  <script>
+    const TEXAS_ID = "126";
+    const TEXAS_ESPN_ID = "126";
+
+    function fmt(date) {
+      return date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+    }
+
+    function fmtTime(date) {
+      return date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZoneName: "short" });
+    }
+
+    // ── Team record + schedule ──
+    async function loadTeam() {
+      try {
+        const res = await fetch(
+          `https://site.api.espn.com/apis/site/v2/sports/baseball/college-baseball/teams/${TEXAS_ID}`
+        );
+        const data = await res.json();
+        const team = data.team;
+
+        // Record
+        const record = team.record?.items?.[0];
+        const confRecord = team.record?.items?.find(i => i.type === "vsconf");
+        const overall = record?.summary || "N/A";
+        const conf = confRecord?.summary || "";
+
+        document.getElementById("record-card").innerHTML = `
+          <div class="card-title">Record</div>
+          <div class="record-big">${overall}</div>
+          <div class="record-sub">${conf ? `SEC: ${conf}` : ""}</div>
+        `;
+      } catch (e) {
+        document.getElementById("record-card").innerHTML =
+          `<div class="card-title">Record</div><div class="error">Could not load</div>`;
+      }
+    }
+
+    // ── Schedule (next + last game) ──
+    async function loadSchedule() {
+      try {
+        const res = await fetch(
+          `https://site.api.espn.com/apis/site/v2/sports/baseball/college-baseball/teams/${TEXAS_ID}/schedule`
+        );
+        const data = await res.json();
+        const events = data.events || [];
+        const now = new Date();
+
+        const upcoming = events.filter(e => new Date(e.date) > now);
+        const past = events.filter(e => new Date(e.date) <= now).reverse();
+
+        // Next game
+        if (upcoming.length > 0) {
+          const next = upcoming[0];
+          const comp = next.competitions?.[0];
+          const home = comp?.competitors?.find(c => c.homeAway === "home");
+          const away = comp?.competitors?.find(c => c.homeAway === "away");
+          const opponent = home?.team?.id === TEXAS_ID ? away?.team?.displayName : home?.team?.displayName;
+          const isHome = home?.team?.id === TEXAS_ID;
+          const venue = comp?.venue?.fullName || "";
+          const city = comp?.venue?.address?.city || "";
+          const gameDate = new Date(next.date);
+
+          document.getElementById("next-game-card").innerHTML = `
+            <div class="card-title">Next Game</div>
+            <div class="next-game-opponent">${isHome ? "vs" : "@"} ${opponent}</div>
+            <div class="next-game-detail">
+              ${fmt(gameDate)}<br>
+              ${fmtTime(gameDate)}<br>
+              ${venue}${city ? `, ${city}` : ""}<br>
+              <span class="highlight">${isHome ? "🏠 Home" : "✈️ Away"}</span>
+            </div>
+          `;
+        } else {
+          document.getElementById("next-game-card").innerHTML =
+            `<div class="card-title">Next Game</div><div class="error">No upcoming games found</div>`;
+        }
+
+        // Last result
+        if (past.length > 0) {
+          const last = past[0];
+          const comp = last.competitions?.[0];
+          const texas = comp?.competitors?.find(c => c.team?.id === TEXAS_ID);
+          const opp = comp?.competitors?.find(c => c.team?.id !== TEXAS_ID);
+          const txScore = texas?.score?.displayValue ?? texas?.score ?? "?";
+          const oppScore = opp?.score?.displayValue ?? opp?.score ?? "?";
+          const oppName = opp?.team?.displayName || "Opponent";
+          const won = parseInt(txScore) > parseInt(oppScore);
+          const gameDate = new Date(last.date);
+
+          document.getElementById("last-game-card").innerHTML = `
+            <div class="card-title">Last Result</div>
+            <div class="next-game-opponent" style="color:${won ? "#4ade80" : "#f87171"}">${won ? "W" : "L"} ${txScore}–${oppScore}</div>
+            <div class="next-game-detail">
+              vs ${oppName}<br>
+              ${fmt(gameDate)}
+            </div>
+          `;
+        } else {
+          document.getElementById("last-game-card").innerHTML =
+            `<div class="card-title">Last Result</div><div class="error">No results yet</div>`;
+        }
+
+      } catch (e) {
+        ["next-game-card", "last-game-card"].forEach(id => {
+          document.getElementById(id).innerHTML =
+            `<div class="card-title">${id === "next-game-card" ? "Next Game" : "Last Result"}</div><div class="error">Could not load</div>`;
+        });
+      }
+    }
+
+    async function loadRanking() {
+      try {
+        const res = await fetch(
+          `https://site.api.espn.com/apis/site/v2/sports/baseball/college-baseball/rankings`
+        );
+        const data = await res.json();
+        const poll = data.rankings?.[0];
+        const entry = poll?.ranks?.find(r => r.team?.id === TEXAS_ID);
+        if (entry?.current) {
+          document.getElementById("team-ranking").textContent = `#${entry.current}`;
+        }
+      } catch (e) {}
+    }
+
+    // ── News ──
+    const NEWS_FEEDS = [
+      { url: "https://feeds.npr.org/1001/rss.xml",                    source: "NPR" },
+      { url: "https://feeds.bbci.co.uk/news/rss.xml",                 source: "BBC News" },
+      { url: "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml", source: "NY Times" },
+      { url: "https://www.theguardian.com/world/rss",                  source: "The Guardian" },
+    ];
+
+    // Seeded shuffle so selection is stable all day but changes daily
+    function seededShuffle(arr, seed) {
+      const a = [...arr];
+      let s = seed;
+      for (let i = a.length - 1; i > 0; i--) {
+        s = (s * 1664525 + 1013904223) & 0xffffffff;
+        const j = Math.abs(s) % (i + 1);
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
+    function relativeDate(dateStr) {
+      const diff = Date.now() - new Date(dateStr).getTime();
+      const h = Math.floor(diff / 3600000);
+      if (h < 1) return "Just now";
+      if (h < 24) return `${h}h ago`;
+      return `${Math.floor(h / 24)}d ago`;
+    }
+
+    async function loadNews() {
+      try {
+        const results = await Promise.allSettled(
+          NEWS_FEEDS.map(f =>
+            fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(f.url)}`)
+              .then(r => r.json())
+              .then(d => (d.items || []).map(item => ({ ...item, _source: f.source })))
+          )
+        );
+
+        const allArticles = results
+          .filter(r => r.status === "fulfilled")
+          .flatMap(r => r.value);
+
+        if (allArticles.length === 0) throw new Error("No articles");
+
+        // Seed with today's date so rotation changes daily
+        const today = new Date();
+        const seed = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
+        const shuffled = seededShuffle(allArticles, seed);
+        const selected = shuffled.slice(0, 6);
+
+        const cards = selected.map(article => `
+          <a class="news-card" href="${article.link}" target="_blank" rel="noopener">
+            <div class="news-source">${article._source}</div>
+            <div class="news-title">${article.title}</div>
+            <div class="news-date">${relativeDate(article.pubDate)}</div>
+          </a>
+        `).join("");
+
+        document.getElementById("news-grid").innerHTML = cards;
+      } catch (e) {
+        document.getElementById("news-grid").innerHTML =
+          `<div style="color:#555;font-size:.85rem;padding:8px">Could not load news</div>`;
+      }
+    }
+
+    loadTeam();
+    loadSchedule();
+    loadRanking();
+    loadNews();
+  </script>
+
+</body>
+</html>
