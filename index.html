@@ -489,7 +489,7 @@
         <div id="flights-live"><div class="loading">Loading...</div></div>
       </div>
       <div class="card">
-        <div class="card-title">Widebodies in Range 🛫</div>
+        <div class="card-title">Widebody Arrivals Today 📅</div>
         <div id="flights-wide"><div class="loading">Loading...</div></div>
       </div>
     </div>
@@ -828,8 +828,8 @@
     }
 
     // ── Flights ──
-    const AVIATION_KEY = "90cae370433a7d969a873e4e33fd46e0";
 
+    // ICAO type codes (used by adsb.fi)
     const WIDEBODY_TYPES = new Set([
       'B741','B742','B743','B744','B748',
       'B762','B763','B764',
@@ -840,121 +840,104 @@
       'A359','A35K','A388',
     ]);
 
-    // Keyed by ICAO 3-letter airline code (what OpenSky uses in callsigns)
-    const AIRLINE_NAMES = {
-      'SWA':'Southwest','DAL':'Delta','UAL':'United','AAL':'American',
-      'ASA':'Alaska','JBU':'JetBlue','FFT':'Frontier','NKS':'Spirit',
-      'GAA':'Allegiant','SCX':'Sun Country','VIR':'Virgin Atlantic',
-      'BAW':'British Airways','DLH':'Lufthansa','ACA':'Air Canada',
-      'AMX':'Aeromexico','CAL':'China Airlines','SKW':'SkyWest',
-      'ENY':'Envoy','RPA':'Republic','PDT':'Piedmont','QXE':'Horizon',
-      'CXK':'CommutAir','ASH':'Mesa',
-    };
+    // IATA type codes (used by AviationStack)
+    const WIDEBODY_IATA = new Set([
+      '741','742','743','744','74H',
+      '762','763','764',
+      '772','773','77L','77W','778','779',
+      '788','789','78X',
+      '332','333','338','339',
+      '342','343','345','346',
+      '359','35K','388',
+    ]);
 
-    function parseCallsign(cs) {
-      cs = cs.trim();
-      const match = cs.match(/^([A-Z]{2,3})(\d+)$/);
-      if (match) {
-        const icao = match[1];
-        return { num: match[2], name: AIRLINE_NAMES[icao] || icao };
-      }
-      return { num: '', name: cs };
-    }
-
-    async function loadFlights() {
-      // One fetch + one set of hexdb lookups feeds both cards
+    // On Approach Now — adsb.fi returns type code directly, no secondary lookup needed
+    async function loadApproach() {
       document.getElementById("flights-live").innerHTML = `<div class="loading">Loading...</div>`;
-      document.getElementById("flights-wide").innerHTML = `<div class="loading">Loading...</div>`;
       try {
-        // Wide bbox for widebodies card; narrow filter applied client-side for On Approach
-        const res = await fetch(
-          "https://opensky-network.org/api/states/all?lamin=27.5&lomin=-100.5&lamax=32.5&lomax=-94.5"
-        );
+        const res = await fetch('https://api.adsb.fi/v1/aircraft?lat=30.1975&lon=-97.6664&radius=60');
         const data = await res.json();
-        const allStates = (data.states || []).filter(s => !s[8] && s[1] && s[1].trim());
-
-        // Build type map — look up every aircraft once, sequentially
-        const typeMap = {};
-        for (const s of allStates) {
-          try {
-            const r = await fetch(`https://hexdb.io/api/v1/aircraft/${s[0]}`);
-            const d = await r.json();
-            if (d.ICAOTypeCode) {
-              typeMap[s[0]] = {
-                typecode: d.ICAOTypeCode,
-                model: d.Type || d.ICAOTypeCode,
-                airline: d.RegisteredOwners || null,
-              };
-            }
-          } catch (_) {}
-        }
-
-        // ── On Approach Now: narrow bbox + descending + low alt ──
-        const approaching = allStates
-          .filter(s =>
-            s[7] != null && s[7] < 4600 &&
-            s[11] != null && s[11] < -1 &&
-            s[2] >= 29.8 && s[2] <= 30.7 &&
-            s[3] >= -98.1 && s[3] <= -97.2
+        const planes = (data.ac || [])
+          .filter(a =>
+            a.flight && a.flight.trim() &&
+            typeof a.alt_baro === 'number' && a.alt_baro < 15000 &&
+            a.baro_rate && a.baro_rate < -300
           )
-          .sort((a, b) => a[7] - b[7])
+          .sort((a, b) => a.alt_baro - b.alt_baro)
           .slice(0, 8);
 
-        if (approaching.length === 0) {
+        if (planes.length === 0) {
           document.getElementById("flights-live").innerHTML =
             `<div style="color:#555;font-size:.85rem">No traffic on approach right now</div>`;
-        } else {
-          const rows = approaching.map(s => {
-            const callsign = s[1].trim();
-            const altFt = Math.round(s[7] * 3.28084);
-            const info = typeMap[s[0]];
-            const typecode = info?.typecode || null;
-            const isWide = typecode && WIDEBODY_TYPES.has(typecode);
-            const cs = parseCallsign(callsign);
-            const name = info?.airline ? `${info.airline} ${cs.num || ''}`.trim() : (cs.num ? `${cs.name} ${cs.num}` : cs.name);
-            const typeLabel = typecode ? `${typecode} · ${info.model}` : '—';
-            return `
-              <div class="flight-row">
-                <div class="flight-callsign">${name}</div>
-                <div class="flight-info">${altFt.toLocaleString()} ft</div>
-                <div class="flight-type ${isWide ? 'widebody' : ''}">${isWide ? '🛫 ' : ''}${typeLabel}</div>
-              </div>`;
-          }).join("");
-          document.getElementById("flights-live").innerHTML = rows;
+          return;
         }
 
-        // ── Widebodies in Range: filter to widebody types across full bbox ──
-        const widebodies = allStates
-          .filter(s => typeMap[s[0]] && WIDEBODY_TYPES.has(typeMap[s[0]].typecode))
-          .sort((a, b) => (a[7] || 99999) - (b[7] || 99999));
-
-        if (widebodies.length === 0) {
-          document.getElementById("flights-wide").innerHTML =
-            `<div style="color:#555;font-size:.85rem;padding:4px 0">No widebodies in the Austin area right now</div>`;
-        } else {
-          const rows = widebodies.map(s => {
-            const info = typeMap[s[0]];
-            const cs = parseCallsign(s[1].trim());
-            const name = info.airline ? `${info.airline} ${cs.num || ''}`.trim() : (cs.num ? `${cs.name} ${cs.num}` : cs.name);
-            const altFt = s[7] ? Math.round(s[7] * 3.28084) : null;
-            const status = (s[11] || 0) < -2 ? '↓' : (s[11] || 0) > 2 ? '↑' : '→';
-            return `
-              <div class="flight-row">
-                <div class="flight-callsign" style="font-size:.8rem">${name}</div>
-                <div class="flight-info">${altFt ? altFt.toLocaleString() + ' ft' : '—'} ${status}</div>
-                <div class="flight-type widebody">🛫 ${info.typecode}</div>
-              </div>`;
-          }).join("");
-          document.getElementById("flights-wide").innerHTML = rows;
-        }
+        const rows = planes.map(a => {
+          const flight = a.flight.trim();
+          const altFt = Math.round(a.alt_baro).toLocaleString();
+          const typecode = a.t || '—';
+          const isWide = a.t && WIDEBODY_TYPES.has(a.t);
+          return `
+            <div class="flight-row">
+              <div class="flight-callsign">${flight}</div>
+              <div class="flight-info">${altFt} ft</div>
+              <div class="flight-type ${isWide ? 'widebody' : ''}">${isWide ? '🛫 ' : ''}${typecode}</div>
+            </div>`;
+        }).join('');
+        document.getElementById("flights-live").innerHTML = rows;
       } catch (e) {
         document.getElementById("flights-live").innerHTML = `<div class="error">Could not load</div>`;
+      }
+    }
+
+    // Widebody Arrivals Today — AviationStack schedule, proxied + cached 8hrs in worker
+    async function loadArrivalSchedule() {
+      document.getElementById("flights-wide").innerHTML = `<div class="loading">Loading...</div>`;
+      try {
+        const res = await fetch('/proxy/aus-schedule');
+        const data = await res.json();
+        const flights = (data.data || [])
+          .filter(f => {
+            const iata = f.aircraft?.iata;
+            const icao = f.aircraft?.icao;
+            return (iata && WIDEBODY_IATA.has(iata)) || (icao && WIDEBODY_TYPES.has(icao));
+          })
+          .sort((a, b) => {
+            const ta = a.arrival?.scheduled ? new Date(a.arrival.scheduled) : Infinity;
+            const tb = b.arrival?.scheduled ? new Date(b.arrival.scheduled) : Infinity;
+            return ta - tb;
+          });
+
+        if (flights.length === 0) {
+          document.getElementById("flights-wide").innerHTML =
+            `<div style="color:#555;font-size:.85rem">No widebody arrivals scheduled today</div>`;
+          return;
+        }
+
+        const rows = flights.map(f => {
+          const time = f.arrival?.scheduled
+            ? new Date(f.arrival.scheduled).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Chicago' })
+            : '—';
+          const flightNum = f.flight?.iata || '—';
+          const airline = f.airline?.name || '—';
+          const type = f.aircraft?.iata || f.aircraft?.icao || '—';
+          return `
+            <div class="flight-row">
+              <div class="flight-time" style="min-width:60px;color:#aaa">${time}</div>
+              <div class="flight-callsign">${flightNum}</div>
+              <div class="flight-info">${airline}</div>
+              <div class="flight-type widebody">🛫 ${type}</div>
+            </div>`;
+        }).join('');
+        document.getElementById("flights-wide").innerHTML = rows;
+      } catch (e) {
         document.getElementById("flights-wide").innerHTML = `<div class="error">Could not load</div>`;
       }
     }
 
     loadWeather();
-    loadFlights();
+    loadApproach();
+    loadArrivalSchedule();
     loadTeam();
     loadSchedule();
     loadRanking();
