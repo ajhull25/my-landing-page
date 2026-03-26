@@ -869,7 +869,6 @@
         const data = await res.json();
         const states = data.states || [];
 
-        // Filter: airborne, below 15000ft, descending, has callsign
         const approaching = states
           .filter(s => !s[8] && s[7] != null && s[7] < 4600 && s[11] != null && s[11] < -1 && s[1] && s[1].trim())
           .sort((a, b) => a[7] - b[7])
@@ -877,19 +876,20 @@
 
         if (approaching.length === 0) {
           document.getElementById("flights-live").innerHTML =
-            `<div class="error">No commercial traffic on approach right now</div>`;
+            `<div class="error">No aircraft on approach right now</div>`;
           return;
         }
 
-        const typeLookups = await Promise.allSettled(
-          approaching.map(s =>
-            fetch(`https://opensky-network.org/api/metadata/aircraft/icao/${s[0]}`)
-              .then(r => r.json())
-              .then(d => ({ icao24: s[0], typecode: d.typecode || null, model: d.model || null, operator: d.operatorIata || null }))
-          )
-        );
+        // Look up type one at a time to avoid rate limiting, only for commercial flights
         const typeMap = {};
-        typeLookups.forEach(r => { if (r.status === 'fulfilled') typeMap[r.value.icao24] = r.value; });
+        const commercial = approaching.filter(s => /^[A-Z]{2,3}\d+$/.test(s[1].trim()));
+        for (const s of commercial) {
+          try {
+            const r = await fetch(`https://opensky-network.org/api/metadata/aircraft/icao/${s[0]}`);
+            const d = await r.json();
+            typeMap[s[0]] = { typecode: d.typecode || null, model: d.model || null };
+          } catch (_) {}
+        }
 
         const rows = approaching.map(s => {
           const callsign = s[1].trim();
@@ -898,11 +898,9 @@
           const typecode = typeInfo?.typecode || null;
           const model = typeInfo?.model || null;
           const isWide = typecode && WIDEBODY_TYPES.has(typecode);
-
           const cs = parseCallsign(callsign);
           const displayName = cs.num ? `${cs.name} ${cs.num}` : cs.name;
-
-          const typeLabel = typecode || (model ? model.split(' ')[0] : '—');
+          const typeLabel = typecode || (model ? model.split('-')[0].trim() : '—');
 
           return `
             <div class="flight-row">
