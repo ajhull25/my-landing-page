@@ -855,9 +855,9 @@
     async function loadApproach() {
       document.getElementById("flights-live").innerHTML = `<div class="loading">Loading...</div>`;
       try {
-        const res = await fetch('https://api.adsb.fi/v1/aircraft?lat=30.1975&lon=-97.6664&radius=60');
+        const res = await fetch('https://opendata.adsb.fi/api/v2/lat/30.1975/lon/-97.6664/dist/60');
         const data = await res.json();
-        const planes = (data.ac || [])
+        const planes = (data.aircraft || [])
           .filter(a =>
             a.flight && a.flight.trim() &&
             typeof a.alt_baro === 'number' && a.alt_baro < 15000 &&
