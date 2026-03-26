@@ -885,9 +885,13 @@
         const commercial = approaching.filter(s => /^[A-Z]{2,3}\d+$/.test(s[1].trim()));
         for (const s of commercial) {
           try {
-            const r = await fetch(`/proxy/aircraft/${s[0]}`);
+            const r = await fetch(`https://hexdb.io/api/v1/aircraft/${s[0]}`);
             const d = await r.json();
-            typeMap[s[0]] = { typecode: d.typecode || null, model: d.model || null };
+            typeMap[s[0]] = {
+              typecode: d.ICAOTypeCode || null,
+              model: d.Type || null,
+              airline: d.RegisteredOwners || null
+            };
           } catch (_) {}
         }
 
@@ -898,9 +902,11 @@
           const typecode = typeInfo?.typecode || null;
           const model = typeInfo?.model || null;
           const isWide = typecode && WIDEBODY_TYPES.has(typecode);
+          // Use hexdb airline name if available, fall back to callsign parsing
           const cs = parseCallsign(callsign);
-          const displayName = cs.num ? `${cs.name} ${cs.num}` : cs.name;
-          const typeLabel = typecode || (model ? model.split('-')[0].trim() : '—');
+          const airlineName = typeInfo?.airline || cs.name;
+          const displayName = cs.num ? `${airlineName} ${cs.num}` : airlineName;
+          const typeLabel = typecode ? `${typecode} · ${model || ''}`.trim().replace(' ·', '') : (model || '—');
 
           return `
             <div class="flight-row">
