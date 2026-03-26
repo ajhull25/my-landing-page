@@ -840,19 +840,25 @@
       'A359','A35K','A388',
     ]);
 
+    // Keyed by ICAO 3-letter airline code (what OpenSky uses in callsigns)
     const AIRLINE_NAMES = {
-      'WN':'Southwest','DL':'Delta','UA':'United','AA':'American',
-      'AS':'Alaska','B6':'JetBlue','F9':'Frontier','NK':'Spirit',
-      'G4':'Allegiant','SY':'Sun Country','VS':'Virgin Atlantic',
-      'BA':'British Airways','LH':'Lufthansa','AC':'Air Canada',
-      'AM':'Aeromexico','CI':'China Airlines',
+      'SWA':'Southwest','DAL':'Delta','UAL':'United','AAL':'American',
+      'ASA':'Alaska','JBU':'JetBlue','FFT':'Frontier','NKS':'Spirit',
+      'GAA':'Allegiant','SCX':'Sun Country','VIR':'Virgin Atlantic',
+      'BAW':'British Airways','DLH':'Lufthansa','ACA':'Air Canada',
+      'AMX':'Aeromexico','CAL':'China Airlines','SKW':'SkyWest',
+      'ENY':'Envoy','RPA':'Republic','PDT':'Piedmont','QXE':'Horizon',
+      'CXK':'CommutAir','ASH':'Mesa',
     };
 
     function parseCallsign(cs) {
       cs = cs.trim();
       const match = cs.match(/^([A-Z]{2,3})(\d+)$/);
-      if (match) return { iata: match[1].substring(0,2), num: match[2], name: AIRLINE_NAMES[match[1].substring(0,2)] || match[1] };
-      return { iata: null, num: cs, name: cs };
+      if (match) {
+        const icao = match[1];
+        return { num: match[2], name: AIRLINE_NAMES[icao] || icao };
+      }
+      return { num: '', name: cs };
     }
 
     async function loadFlightsLive() {
@@ -893,15 +899,8 @@
           const model = typeInfo?.model || null;
           const isWide = typecode && WIDEBODY_TYPES.has(typecode);
 
-          // Parse airline from callsign (e.g. SWA673 → Southwest 673)
-          const airlineMatch = callsign.match(/^([A-Z]{2,3})(\d+)$/);
-          let displayName = callsign;
-          if (airlineMatch) {
-            const iata = airlineMatch[1].length === 3
-              ? airlineMatch[1].substring(0, 2)
-              : airlineMatch[1];
-            displayName = (AIRLINE_NAMES[iata] || airlineMatch[1]) + ' ' + airlineMatch[2];
-          }
+          const cs = parseCallsign(callsign);
+          const displayName = cs.num ? `${cs.name} ${cs.num}` : cs.name;
 
           const typeLabel = typecode || (model ? model.split(' ')[0] : '—');
 
