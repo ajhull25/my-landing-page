@@ -226,6 +226,83 @@
       font-size: 0.82rem;
     }
 
+    /* ── Weather ── */
+    .weather-section {
+      width: 100%;
+      max-width: 820px;
+      margin-bottom: 24px;
+    }
+
+    .weather-card {
+      background-color: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 12px;
+      padding: 20px 24px;
+      display: flex;
+      align-items: center;
+      gap: 32px;
+      flex-wrap: wrap;
+    }
+
+    .weather-current {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .weather-emoji { font-size: 2.4rem; }
+
+    .weather-temp {
+      font-size: 2.2rem;
+      font-weight: 700;
+      color: #fff;
+      line-height: 1;
+    }
+
+    .weather-desc {
+      font-size: 0.85rem;
+      color: #888;
+      margin-top: 4px;
+    }
+
+    .weather-meta {
+      font-size: 0.82rem;
+      color: #666;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .weather-forecast {
+      display: flex;
+      gap: 16px;
+      margin-left: auto;
+    }
+
+    .forecast-day {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .forecast-day-name {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #555;
+    }
+
+    .forecast-emoji { font-size: 1.2rem; }
+
+    .forecast-temps {
+      font-size: 0.78rem;
+      color: #888;
+      text-align: center;
+    }
+
+    .forecast-temps span { color: #ccc; font-weight: 600; }
+
     /* ── News section ── */
     .news-section {
       width: 100%;
@@ -343,6 +420,14 @@
           </script>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- Weather -->
+  <div class="weather-section">
+    <p class="section-label">Austin, TX</p>
+    <div id="weather-card" class="weather-card">
+      <div style="color:#555;font-size:.85rem">Loading...</div>
     </div>
   </div>
 
@@ -620,6 +705,65 @@
       }
     }
 
+    // ── Weather ──
+    const WMO = {
+      0: ["☀️","Clear"], 1: ["🌤️","Mainly Clear"], 2: ["⛅","Partly Cloudy"], 3: ["☁️","Overcast"],
+      45: ["🌫️","Fog"], 48: ["🌫️","Fog"],
+      51: ["🌦️","Light Drizzle"], 53: ["🌦️","Drizzle"], 55: ["🌧️","Heavy Drizzle"],
+      61: ["🌧️","Light Rain"], 63: ["🌧️","Rain"], 65: ["🌧️","Heavy Rain"],
+      71: ["🌨️","Light Snow"], 73: ["❄️","Snow"], 75: ["❄️","Heavy Snow"],
+      80: ["🌦️","Showers"], 81: ["🌧️","Showers"], 82: ["⛈️","Heavy Showers"],
+      95: ["⛈️","Thunderstorm"], 96: ["⛈️","Thunderstorm"], 99: ["⛈️","Thunderstorm"],
+    };
+
+    function wmo(code) { return WMO[code] || ["🌡️", "Unknown"]; }
+
+    async function loadWeather() {
+      try {
+        const res = await fetch(
+          "https://api.open-meteo.com/v1/forecast?latitude=30.2672&longitude=-97.7431" +
+          "&current=temperature_2m,weathercode,windspeed_10m,relative_humidity_2m" +
+          "&daily=temperature_2m_max,temperature_2m_min,weathercode" +
+          "&temperature_unit=fahrenheit&timezone=America%2FChicago&forecast_days=4"
+        );
+        const d = await res.json();
+        const cur = d.current;
+        const daily = d.daily;
+        const [emoji, desc] = wmo(cur.weathercode);
+
+        const forecastHTML = daily.time.slice(1).map((date, i) => {
+          const day = new Date(date + "T12:00:00").toLocaleDateString("en-US", { weekday: "short" });
+          const [fe] = wmo(daily.weathercode[i + 1]);
+          return `
+            <div class="forecast-day">
+              <div class="forecast-day-name">${day}</div>
+              <div class="forecast-emoji">${fe}</div>
+              <div class="forecast-temps"><span>${Math.round(daily.temperature_2m_max[i+1])}°</span> / ${Math.round(daily.temperature_2m_min[i+1])}°</div>
+            </div>`;
+        }).join("");
+
+        document.getElementById("weather-card").innerHTML = `
+          <div class="weather-current">
+            <div class="weather-emoji">${emoji}</div>
+            <div>
+              <div class="weather-temp">${Math.round(cur.temperature_2m)}°F</div>
+              <div class="weather-desc">${desc}</div>
+            </div>
+          </div>
+          <div class="weather-meta">
+            <div>High ${Math.round(daily.temperature_2m_max[0])}° / Low ${Math.round(daily.temperature_2m_min[0])}°</div>
+            <div>Humidity ${cur.relative_humidity_2m}%</div>
+            <div>Wind ${Math.round(cur.windspeed_10m * 0.621)} mph</div>
+          </div>
+          <div class="weather-forecast">${forecastHTML}</div>
+        `;
+      } catch (e) {
+        document.getElementById("weather-card").innerHTML =
+          `<div style="color:#555;font-size:.85rem">Could not load weather</div>`;
+      }
+    }
+
+    loadWeather();
     loadTeam();
     loadSchedule();
     loadRanking();
