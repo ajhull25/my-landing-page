@@ -8,6 +8,17 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
+    // Proxy: adsb.fi live approach traffic (CORS not allowed from browser)
+    if (url.pathname === '/proxy/approach') {
+      try {
+        const res = await fetch('https://opendata.adsb.fi/api/v2/lat/30.1975/lon/-97.6664/dist/60');
+        const data = await res.json();
+        return new Response(JSON.stringify(data), { headers: CORS });
+      } catch (e) {
+        return new Response('{"aircraft":[]}', { headers: CORS });
+      }
+    }
+
     // Proxy: AviationStack scheduled arrivals — in-memory cache, 8 hours
     if (url.pathname === '/proxy/aus-schedule') {
       if (scheduleCache && Date.now() - scheduleCachedAt < EIGHT_HOURS) {

@@ -855,7 +855,7 @@
     async function loadApproach() {
       document.getElementById("flights-live").innerHTML = `<div class="loading">Loading...</div>`;
       try {
-        const res = await fetch('https://opendata.adsb.fi/api/v2/lat/30.1975/lon/-97.6664/dist/60');
+        const res = await fetch('/proxy/approach');
         const data = await res.json();
         const planes = (data.aircraft || [])
           .filter(a =>
