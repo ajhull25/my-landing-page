@@ -863,14 +863,15 @@
         const data = await res.json();
         const states = data.states || [];
 
+        // Filter: airborne, below 15000ft, descending, has callsign
         const approaching = states
-          .filter(s => !s[8] && s[7] != null && s[7] < 4600 && s[11] != null && s[11] < -1 && s[1])
+          .filter(s => !s[8] && s[7] != null && s[7] < 4600 && s[11] != null && s[11] < -1 && s[1] && s[1].trim())
           .sort((a, b) => a[7] - b[7])
           .slice(0, 8);
 
         if (approaching.length === 0) {
           document.getElementById("flights-live").innerHTML =
-            `<div class="error">No aircraft on approach right now</div>`;
+            `<div class="error">No commercial traffic on approach right now</div>`;
           return;
         }
 
@@ -878,23 +879,35 @@
           approaching.map(s =>
             fetch(`https://opensky-network.org/api/metadata/aircraft/icao/${s[0]}`)
               .then(r => r.json())
-              .then(d => ({ icao24: s[0], typecode: d.typecode || null, model: d.model || null }))
+              .then(d => ({ icao24: s[0], typecode: d.typecode || null, model: d.model || null, operator: d.operatorIata || null }))
           )
         );
         const typeMap = {};
         typeLookups.forEach(r => { if (r.status === 'fulfilled') typeMap[r.value.icao24] = r.value; });
 
         const rows = approaching.map(s => {
-          const cs = parseCallsign(s[1] || s[0]);
+          const callsign = s[1].trim();
           const altFt = Math.round(s[7] * 3.28084);
           const typeInfo = typeMap[s[0]];
           const typecode = typeInfo?.typecode || null;
+          const model = typeInfo?.model || null;
           const isWide = typecode && WIDEBODY_TYPES.has(typecode);
-          const typeLabel = typecode || "—";
+
+          // Parse airline from callsign (e.g. SWA673 → Southwest 673)
+          const airlineMatch = callsign.match(/^([A-Z]{2,3})(\d+)$/);
+          let displayName = callsign;
+          if (airlineMatch) {
+            const iata = airlineMatch[1].length === 3
+              ? airlineMatch[1].substring(0, 2)
+              : airlineMatch[1];
+            displayName = (AIRLINE_NAMES[iata] || airlineMatch[1]) + ' ' + airlineMatch[2];
+          }
+
+          const typeLabel = typecode || (model ? model.split(' ')[0] : '—');
 
           return `
             <div class="flight-row">
-              <div class="flight-callsign">${cs.name} ${cs.num}</div>
+              <div class="flight-callsign">${displayName}</div>
               <div class="flight-info">${altFt.toLocaleString()} ft</div>
               <div class="flight-type ${isWide ? 'widebody' : ''}">${isWide ? '🛫 ' : ''}${typeLabel}</div>
             </div>`;
@@ -909,10 +922,10 @@
 
     async function loadFlightsSchedule() {
       try {
-        const res = await fetch(
-          `http://api.aviationstack.com/v1/flights?access_key=${AVIATION_KEY}&arr_iata=AUS&flight_status=active&limit=10`
-        );
-        const data = await res.json();
+        const apiUrl = `http://api.aviationstack.com/v1/flights?access_key=${AVIATION_KEY}&arr_iata=AUS&flight_status=active&limit=10`;
+        const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(apiUrl)}`);
+        const wrapper = await res.json();
+        const data = JSON.parse(wrapper.contents);
         const flights = (data.data || [])
           .filter(f => f.airline?.name && f.airline.name !== 'empty' && f.departure?.iata)
           .slice(0, 8);
@@ -920,15 +933,16 @@
         if (flights.length === 0) throw new Error("No flights");
 
         const rows = flights.map(f => {
-          const arr = f.arrival?.scheduled ? new Date(f.arrival.scheduled) : null;
-          const timeStr = arr ? arr.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : "";
+          const arr = f.arrival?.estimated || f.arrival?.scheduled;
+          const timeStr = arr ? new Date(arr).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : "";
           const typecode = f.aircraft?.iata || null;
           const isWide = typecode && WIDEBODY_TYPES.has(typecode);
+          const airline = f.airline.name.replace('Airlines','').replace('Air Lines','').trim();
           return `
             <div class="flight-row">
               <div class="flight-callsign">${f.flight?.iata || "—"}</div>
-              <div class="flight-info">from ${f.departure.iata}</div>
-              ${typecode ? `<div class="flight-type ${isWide ? 'widebody' : ''}">${isWide ? '🛫 ' : ''}${typecode}</div>` : '<div class="flight-type">—</div>'}
+              <div class="flight-info">${airline} · ${f.departure.iata}</div>
+              <div class="flight-type ${isWide ? 'widebody' : ''}">${isWide ? '🛫 ' : ''}${typecode || '—'}</div>
               <div class="flight-time">${timeStr}</div>
             </div>`;
         }).join("");
