@@ -379,6 +379,13 @@
     </div>
   </div>
 
+  <div class="news-section" style="margin-top:24px">
+    <p class="section-label">🤖 AI News</p>
+    <div class="news-grid" id="ai-news-grid">
+      <div class="card" style="grid-column:span 3;color:#555;font-size:.85rem">Loading...</div>
+    </div>
+  </div>
+
   <script>
     const TEXAS_ID = "126";
     const TEXAS_ESPN_ID = "126";
@@ -569,10 +576,55 @@
       }
     }
 
+    // ── AI News ──
+    const AI_NEWS_FEEDS = [
+      { url: "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml", source: "The Verge" },
+      { url: "https://feeds.feedburner.com/venturebeat/SZYF",                     source: "VentureBeat" },
+      { url: "https://feeds.arstechnica.com/arstechnica/technology-lab",           source: "Ars Technica" },
+      { url: "https://www.technologyreview.com/feed/",                             source: "MIT Tech Review" },
+    ];
+
+    async function loadAINews() {
+      try {
+        const results = await Promise.allSettled(
+          AI_NEWS_FEEDS.map(f =>
+            fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(f.url)}`)
+              .then(r => r.json())
+              .then(d => (d.items || []).map(item => ({ ...item, _source: f.source })))
+          )
+        );
+
+        const allArticles = results
+          .filter(r => r.status === "fulfilled")
+          .flatMap(r => r.value);
+
+        if (allArticles.length === 0) throw new Error("No articles");
+
+        const today = new Date();
+        const seed = (today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate()) ^ 0xAI;
+        const shuffled = seededShuffle(allArticles, seed);
+        const selected = shuffled.slice(0, 6);
+
+        const cards = selected.map(article => `
+          <a class="news-card" href="${article.link}" target="_blank" rel="noopener">
+            <div class="news-source">${article._source}</div>
+            <div class="news-title">${article.title}</div>
+            <div class="news-date">${relativeDate(article.pubDate)}</div>
+          </a>
+        `).join("");
+
+        document.getElementById("ai-news-grid").innerHTML = cards;
+      } catch (e) {
+        document.getElementById("ai-news-grid").innerHTML =
+          `<div style="color:#555;font-size:.85rem;padding:8px">Could not load AI news</div>`;
+      }
+    }
+
     loadTeam();
     loadSchedule();
     loadRanking();
     loadNews();
+    loadAINews();
   </script>
 
 </body>
