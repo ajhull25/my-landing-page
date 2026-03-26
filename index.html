@@ -861,129 +861,100 @@
       return { num: '', name: cs };
     }
 
-    async function loadFlightsLive() {
+    async function loadFlights() {
+      // One fetch + one set of hexdb lookups feeds both cards
+      document.getElementById("flights-live").innerHTML = `<div class="loading">Loading...</div>`;
+      document.getElementById("flights-wide").innerHTML = `<div class="loading">Loading...</div>`;
       try {
+        // Wide bbox for widebodies card; narrow filter applied client-side for On Approach
         const res = await fetch(
-          "https://opensky-network.org/api/states/all?lamin=29.8&lomin=-98.1&lamax=30.7&lomax=-97.2"
+          "https://opensky-network.org/api/states/all?lamin=27.5&lomin=-100.5&lamax=32.5&lomax=-94.5"
         );
         const data = await res.json();
-        const states = data.states || [];
+        const allStates = (data.states || []).filter(s => !s[8] && s[1] && s[1].trim());
 
-        const approaching = states
-          .filter(s => !s[8] && s[7] != null && s[7] < 4600 && s[11] != null && s[11] < -1 && s[1] && s[1].trim())
+        // Build type map — look up every aircraft once, sequentially
+        const typeMap = {};
+        for (const s of allStates) {
+          try {
+            const r = await fetch(`https://hexdb.io/api/v1/aircraft/${s[0]}`);
+            const d = await r.json();
+            if (d.ICAOTypeCode) {
+              typeMap[s[0]] = {
+                typecode: d.ICAOTypeCode,
+                model: d.Type || d.ICAOTypeCode,
+                airline: d.RegisteredOwners || null,
+              };
+            }
+          } catch (_) {}
+        }
+
+        // ── On Approach Now: narrow bbox + descending + low alt ──
+        const approaching = allStates
+          .filter(s =>
+            s[7] != null && s[7] < 4600 &&
+            s[11] != null && s[11] < -1 &&
+            s[2] >= 29.8 && s[2] <= 30.7 &&
+            s[3] >= -98.1 && s[3] <= -97.2
+          )
           .sort((a, b) => a[7] - b[7])
           .slice(0, 8);
 
         if (approaching.length === 0) {
           document.getElementById("flights-live").innerHTML =
-            `<div class="error">No aircraft on approach right now</div>`;
-          return;
+            `<div style="color:#555;font-size:.85rem">No traffic on approach right now</div>`;
+        } else {
+          const rows = approaching.map(s => {
+            const callsign = s[1].trim();
+            const altFt = Math.round(s[7] * 3.28084);
+            const info = typeMap[s[0]];
+            const typecode = info?.typecode || null;
+            const isWide = typecode && WIDEBODY_TYPES.has(typecode);
+            const cs = parseCallsign(callsign);
+            const name = info?.airline ? `${info.airline} ${cs.num || ''}`.trim() : (cs.num ? `${cs.name} ${cs.num}` : cs.name);
+            const typeLabel = typecode ? `${typecode} · ${info.model}` : '—';
+            return `
+              <div class="flight-row">
+                <div class="flight-callsign">${name}</div>
+                <div class="flight-info">${altFt.toLocaleString()} ft</div>
+                <div class="flight-type ${isWide ? 'widebody' : ''}">${isWide ? '🛫 ' : ''}${typeLabel}</div>
+              </div>`;
+          }).join("");
+          document.getElementById("flights-live").innerHTML = rows;
         }
 
-        // Look up type one at a time to avoid rate limiting, only for commercial flights
-        const typeMap = {};
-        const commercial = approaching.filter(s => /^[A-Z]{2,3}\d+$/.test(s[1].trim()));
-        for (const s of commercial) {
-          try {
-            const r = await fetch(`https://hexdb.io/api/v1/aircraft/${s[0]}`);
-            const d = await r.json();
-            typeMap[s[0]] = {
-              typecode: d.ICAOTypeCode || null,
-              model: d.Type || null,
-              airline: d.RegisteredOwners || null
-            };
-          } catch (_) {}
-        }
-
-        const rows = approaching.map(s => {
-          const callsign = s[1].trim();
-          const altFt = Math.round(s[7] * 3.28084);
-          const typeInfo = typeMap[s[0]];
-          const typecode = typeInfo?.typecode || null;
-          const model = typeInfo?.model || null;
-          const isWide = typecode && WIDEBODY_TYPES.has(typecode);
-          // Use hexdb airline name if available, fall back to callsign parsing
-          const cs = parseCallsign(callsign);
-          const airlineName = typeInfo?.airline || cs.name;
-          const displayName = cs.num ? `${airlineName} ${cs.num}` : airlineName;
-          const typeLabel = typecode ? `${typecode} · ${model || ''}`.trim().replace(' ·', '') : (model || '—');
-
-          return `
-            <div class="flight-row">
-              <div class="flight-callsign">${displayName}</div>
-              <div class="flight-info">${altFt.toLocaleString()} ft</div>
-              <div class="flight-type ${isWide ? 'widebody' : ''}">${isWide ? '🛫 ' : ''}${typeLabel}</div>
-            </div>`;
-        }).join("");
-
-        document.getElementById("flights-live").innerHTML = rows;
-      } catch (e) {
-        document.getElementById("flights-live").innerHTML =
-          `<div class="error">Could not load live data</div>`;
-      }
-    }
-
-    async function loadWidebodies() {
-      try {
-        // Wider bbox — ~200 miles around AUS to catch widebodies before final approach
-        const res = await fetch(
-          "https://opensky-network.org/api/states/all?lamin=27.5&lomin=-100.5&lamax=32.5&lomax=-94.5"
-        );
-        const data = await res.json();
-        const states = (data.states || []).filter(s => !s[8] && s[1] && s[1].trim());
-
-        // Look up types for all airborne aircraft with callsigns (batch, sequential to avoid rate limits)
-        const widebodies = [];
-        for (const s of states) {
-          try {
-            const r = await fetch(`https://hexdb.io/api/v1/aircraft/${s[0]}`);
-            const d = await r.json();
-            const tc = d.ICAOTypeCode || null;
-            if (tc && WIDEBODY_TYPES.has(tc)) {
-              widebodies.push({
-                callsign: s[1].trim(),
-                icao24: s[0],
-                altFt: s[7] ? Math.round(s[7] * 3.28084) : null,
-                vrate: s[11] || 0,
-                typecode: tc,
-                model: d.Type || tc,
-                airline: d.RegisteredOwners || null,
-              });
-            }
-          } catch (_) {}
-        }
+        // ── Widebodies in Range: filter to widebody types across full bbox ──
+        const widebodies = allStates
+          .filter(s => typeMap[s[0]] && WIDEBODY_TYPES.has(typeMap[s[0]].typecode))
+          .sort((a, b) => (a[7] || 99999) - (b[7] || 99999));
 
         if (widebodies.length === 0) {
           document.getElementById("flights-wide").innerHTML =
             `<div style="color:#555;font-size:.85rem;padding:4px 0">No widebodies in the Austin area right now</div>`;
-          return;
+        } else {
+          const rows = widebodies.map(s => {
+            const info = typeMap[s[0]];
+            const cs = parseCallsign(s[1].trim());
+            const name = info.airline ? `${info.airline} ${cs.num || ''}`.trim() : (cs.num ? `${cs.name} ${cs.num}` : cs.name);
+            const altFt = s[7] ? Math.round(s[7] * 3.28084) : null;
+            const status = (s[11] || 0) < -2 ? '↓' : (s[11] || 0) > 2 ? '↑' : '→';
+            return `
+              <div class="flight-row">
+                <div class="flight-callsign" style="font-size:.8rem">${name}</div>
+                <div class="flight-info">${altFt ? altFt.toLocaleString() + ' ft' : '—'} ${status}</div>
+                <div class="flight-type widebody">🛫 ${info.typecode}</div>
+              </div>`;
+          }).join("");
+          document.getElementById("flights-wide").innerHTML = rows;
         }
-
-        widebodies.sort((a, b) => (a.altFt || 99999) - (b.altFt || 99999));
-
-        const rows = widebodies.map(w => {
-          const cs = parseCallsign(w.callsign);
-          const name = w.airline || (cs.num ? `${cs.name} ${cs.num}` : cs.name);
-          const status = w.vrate < -2 ? '↓ descending' : w.vrate > 2 ? '↑ climbing' : '→ level';
-          const alt = w.altFt ? `${w.altFt.toLocaleString()} ft` : '—';
-          return `
-            <div class="flight-row">
-              <div class="flight-callsign" style="font-size:.8rem">${name}</div>
-              <div class="flight-info">${alt} ${status}</div>
-              <div class="flight-type widebody">🛫 ${w.typecode}</div>
-            </div>`;
-        }).join("");
-
-        document.getElementById("flights-wide").innerHTML = rows;
       } catch (e) {
-        document.getElementById("flights-wide").innerHTML =
-          `<div class="error">Could not load</div>`;
+        document.getElementById("flights-live").innerHTML = `<div class="error">Could not load</div>`;
+        document.getElementById("flights-wide").innerHTML = `<div class="error">Could not load</div>`;
       }
     }
 
     loadWeather();
-    loadFlightsLive();
-    loadWidebodies();
+    loadFlights();
     loadTeam();
     loadSchedule();
     loadRanking();
