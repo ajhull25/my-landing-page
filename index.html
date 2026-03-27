@@ -889,6 +889,20 @@
       'A359','A35K','A388',
     ]);
 
+    function fmtAircraftType(t, desc) {
+      if (!desc) return t || '—';
+      const words = desc.split(' ');
+      // Title-case words, but preserve model numbers (anything with a digit) as-is
+      const titled = words.map(w => /\d/.test(w) ? w : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+      // Take up to 3 words, stopping before 19 chars
+      let out = titled[0];
+      for (let i = 1; i < Math.min(titled.length, 3); i++) {
+        if ((out + ' ' + titled[i]).length < 19) out += ' ' + titled[i];
+        else break;
+      }
+      return out;
+    }
+
     async function loadApproach() {
       document.getElementById('flights-live').innerHTML = '<div class="loading">Loading...</div>';
       try {
@@ -910,7 +924,7 @@
             <div class="flight-row">
               <div class="flight-callsign">${a.flight.trim()}</div>
               <div class="flight-info">${Math.round(a.alt_baro).toLocaleString()} ft</div>
-              <div class="flight-type ${isWide ? 'widebody' : ''}">${isWide ? '🛫 ' : ''}${a.t || '—'}</div>
+              <div class="flight-type ${isWide ? 'widebody' : ''}">${isWide ? '🛫 ' : ''}${fmtAircraftType(a.t, a.desc)}</div>
             </div>`;
         }).join('');
       } catch (e) {
