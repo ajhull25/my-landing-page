@@ -814,9 +814,11 @@
     async function loadFootballCompact() {
       const el = document.getElementById('secondary-sport-card');
       try {
+        // Explicitly request last completed football season (Aug-Dec season spans two years)
+        const fbSeason = new Date().getMonth() < 7 ? new Date().getFullYear() - 1 : new Date().getFullYear();
         const [teamRes, schedRes] = await Promise.all([
           fetch(`https://site.api.espn.com/apis/site/v2/sports/football/college-football/teams/${TEXAS_FB_ID}`),
-          fetch(`https://site.api.espn.com/apis/site/v2/sports/football/college-football/teams/${TEXAS_FB_ID}/schedule`)
+          fetch(`https://site.api.espn.com/apis/site/v2/sports/football/college-football/teams/${TEXAS_FB_ID}/schedule?season=${fbSeason}`)
         ]);
         const teamData = await teamRes.json();
         const schedData = await schedRes.json();
@@ -1084,11 +1086,22 @@
       return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     }
 
+    // scheduledCDT: expected arrival time in Austin (HH:MM, 24h, Central time)
     const INTL_FLIGHTS = [
-      { airline: 'Lufthansa',      iata: 'LH441',  callsign: 'DLH441', type: 'Boeing 787',  origin: 'Frankfurt' },
-      { airline: 'KLM',            iata: 'KL663',  callsign: 'KLM663', type: 'Boeing 787',  origin: 'Amsterdam' },
-      { airline: 'British Airways',iata: 'BA192',  callsign: 'BAW192', type: 'Airbus A350', origin: 'London'    },
+      { airline: 'Lufthansa',      iata: 'LH441',  callsign: 'DLH441', type: 'Boeing 787',  origin: 'Frankfurt', scheduledCDT: '13:30' },
+      { airline: 'KLM',            iata: 'KL663',  callsign: 'KLM663', type: 'Boeing 787',  origin: 'Amsterdam', scheduledCDT: '14:45' },
+      { airline: 'British Airways',iata: 'BA192',  callsign: 'BAW192', type: 'Airbus A350', origin: 'London',    scheduledCDT: '15:45' },
     ];
+
+    function cdtMinutes() {
+      const cdt = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' }));
+      return cdt.getHours() * 60 + cdt.getMinutes();
+    }
+
+    function fmtCDT(hhmm) {
+      const [h, m] = hhmm.split(':').map(Number);
+      return `${h % 12 || 12}:${m.toString().padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
+    }
 
     async function loadIntlArrivals() {
       document.getElementById('flights-wide').innerHTML = '<div class="loading">Loading...</div>';
@@ -1097,7 +1110,13 @@
           const res = await fetch(`/proxy/callsign/${f.callsign}`);
           const data = await res.json();
           const ac = (data.aircraft || [])[0];
-          if (!ac || !ac.lat) return { ...f, status: 'nottracked' };
+          if (!ac || !ac.lat) {
+            const [sh, sm] = f.scheduledCDT.split(':').map(Number);
+            const schedMins = sh * 60 + sm;
+            const nowMins = cdtMinutes();
+            const st = nowMins > schedMins + 30 ? 'arrived' : nowMins < schedMins - 600 ? 'predeparture' : 'enroute_nosignal';
+            return { ...f, status: st };
+          }
           const dist = distNm(ac.lat, ac.lon, AUS_LAT, AUS_LON);
           const gs = ac.gs || 480;
           const eta = new Date(Date.now() + (dist / gs) * 3600000)
@@ -1115,8 +1134,14 @@
         } else if (f.status === 'landed') {
           badge = `<span style="color:#4ade80;font-size:.78rem;font-weight:600">Landed</span>`;
           detail = f.origin;
+        } else if (f.status === 'arrived') {
+          badge = `<span style="color:#4ade80;font-size:.78rem;font-weight:600">Arrived</span>`;
+          detail = `~${fmtCDT(f.scheduledCDT)} CDT`;
+        } else if (f.status === 'enroute_nosignal') {
+          badge = `<span style="color:#facc15;font-size:.78rem;font-weight:600">En Route</span>`;
+          detail = `ETA ~${fmtCDT(f.scheduledCDT)} CDT`;
         } else {
-          badge = `<span style="color:#555;font-size:.78rem">Not yet airborne</span>`;
+          badge = `<span style="color:#555;font-size:.78rem">Departs today</span>`;
           detail = f.origin;
         }
         return `
