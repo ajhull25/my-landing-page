@@ -513,6 +513,7 @@
     <div id="weather-card" class="weather-card">
       <div style="color:#555;font-size:.85rem">Loading...</div>
     </div>
+    <div id="going-out" style="margin-top:10px;padding:12px 16px;background:#1a1a1a;border-radius:10px;border:1px solid #2a2a2a"></div>
   </div>
 
   <!-- Traffic -->
@@ -1017,7 +1018,7 @@
         const res = await fetch(
           "https://api.open-meteo.com/v1/forecast?latitude=30.2672&longitude=-97.7431" +
           "&current=temperature_2m,weathercode,windspeed_10m,relative_humidity_2m" +
-          "&daily=temperature_2m_max,temperature_2m_min,weathercode" +
+          "&daily=temperature_2m_max,temperature_2m_min,weathercode,precipitation_probability_max" +
           "&temperature_unit=fahrenheit&timezone=America%2FChicago&forecast_days=4"
         );
         const d = await res.json();
@@ -1050,6 +1051,37 @@
             <div>Wind ${Math.round(cur.windspeed_10m * 0.621)} mph</div>
           </div>
           <div class="weather-forecast">${forecastHTML}</div>
+        `;
+
+        // Going Out tips
+        const tips = [];
+        const rainChance = daily.precipitation_probability_max[0];
+        const hiTemp = daily.temperature_2m_max[0];
+        const loTemp = daily.temperature_2m_min[0];
+        const windMph = Math.round(cur.windspeed_10m * 0.621);
+        const wcode = cur.weathercode;
+
+        if (rainChance >= 60) tips.push(`☔ ${rainChance}% chance of rain — bring an umbrella`);
+        else if (rainChance >= 30) tips.push(`🌂 ${rainChance}% chance of rain — maybe pack one`);
+
+        if (wcode >= 95) tips.push("⛈️ Thunderstorms today — plan around them");
+
+        if (hiTemp >= 100) tips.push("🔥 Dangerously hot — hydrate and limit time outside");
+        else if (hiTemp >= 95) tips.push("☀️ Very hot today — stay hydrated");
+        else if (hiTemp >= 85 && loTemp >= 70) tips.push("😎 Warm all day — light clothes");
+
+        const tempDrop = hiTemp - loTemp;
+        if (tempDrop >= 25 && loTemp < 60) tips.push(`🧥 Big temp swing (${Math.round(hiTemp)}° → ${Math.round(loTemp)}°) — bring a layer`);
+        else if (loTemp < 50) tips.push(`🧥 Cold tonight (${Math.round(loTemp)}°) — grab a jacket`);
+        else if (loTemp < 65 && hiTemp >= 75) tips.push(`👕 Warm afternoon but cool evening (${Math.round(loTemp)}°) — layer up`);
+
+        if (windMph >= 25) tips.push(`💨 Windy today (${windMph} mph) — secure loose stuff`);
+
+        if (tips.length === 0) tips.push("✅ Looks like a nice day — no special prep needed");
+
+        document.getElementById("going-out").innerHTML = `
+          <div style="font-size:.7rem;text-transform:uppercase;letter-spacing:1px;color:#555;margin-bottom:8px">Going Out?</div>
+          ${tips.map(t => `<div style="font-size:.82rem;color:#bbb;margin-bottom:5px">${t}</div>`).join("")}
         `;
       } catch (e) {
         document.getElementById("weather-card").innerHTML =
