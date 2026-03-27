@@ -350,11 +350,6 @@
       gap: 16px;
     }
 
-    .flights-grid-3 {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 16px;
-    }
 
     .flight-row {
       display: flex;
@@ -444,7 +439,7 @@
     }
 
     @media (max-width: 700px) {
-      .top-grid, .longhorns-grid, .news-grid, .flights-grid, .flights-grid-3 {
+      .top-grid, .longhorns-grid, .news-grid, .flights-grid {
         grid-template-columns: 1fr;
       }
       .standings-card {
@@ -538,18 +533,14 @@
   <!-- Flights -->
   <div class="flights-section">
     <p class="section-label">✈️ Austin Airport (AUS)</p>
-    <div class="flights-grid-3">
+    <div class="flights-grid">
       <div class="card">
         <div class="card-title">On Approach Now</div>
         <div id="flights-live"><div class="loading">Loading...</div></div>
       </div>
       <div class="card">
-        <div class="card-title">Widebody Arrivals Today 📅</div>
+        <div class="card-title">Int'l Widebodies</div>
         <div id="flights-wide"><div class="loading">Loading...</div></div>
-      </div>
-      <div class="card">
-        <div class="card-title">Interesting Flights 👀</div>
-        <div id="flights-interesting"><div class="loading">Loading...</div></div>
       </div>
     </div>
   </div>
@@ -888,7 +879,6 @@
 
     // ── Flights ──
 
-    // ICAO type codes (used by adsb.fi)
     const WIDEBODY_TYPES = new Set([
       'B741','B742','B743','B744','B748',
       'B762','B763','B764',
@@ -899,139 +889,93 @@
       'A359','A35K','A388',
     ]);
 
-    // IATA type codes (used by AviationStack)
-    const WIDEBODY_IATA = new Set([
-      '741','742','743','744','74H',
-      '762','763','764',
-      '772','773','77L','77W','778','779',
-      '788','789','78X',
-      '332','333','338','339',
-      '342','343','345','346',
-      '359','35K','388',
-    ]);
-
-    // Military/gov/foreign/emergency callsign detection
-    const MIL_PREFIXES = ['REACH','PACK','DUKE','KNIFE','TOPCAT','EVAC','ANGEL','BOXER',
-      'GHOST','HAVOC','IRON','JAKE','KING','LANCE','NOBLE','RAVEN','ROCKY','SABER',
-      'SCOTT','TALON','TIGER','VALOR','VIPER','FORGE','CABAL','MARCO','PAVE','SLAM',
-      'TROUT','UGLY','VADER','WRATH','YANKY','ZIPPY'];
-    const GOV_PREFIXES = ['SAM','VENUS','MARINE','EXEC'];
-    const FOREIGN_ICAO = new Set(['BAW','DLH','AFR','KLM','IBE','UAE','QTR','SIA',
-      'CPA','JAL','ANA','KAL','ETH','TAM','GOL','AZU','LAN','AVA','MXY','THY',
-      'TAP','LOT','FIN','SAS','AUA','CSN','CCA','HVN','SVA','MSR','TUA']);
-
-    function classifyFlight(a) {
-      const flight = (a.flight || '').trim().toUpperCase();
-      if (!flight) return null;
-      if (a.squawk === '7700') return { label: '🚨 Emergency', badge: '#f87171' };
-      if (GOV_PREFIXES.some(p => flight.startsWith(p))) return { label: '🏛️ Gov/Exec', badge: '#a78bfa' };
-      if (MIL_PREFIXES.some(p => flight.startsWith(p))) return { label: '✈️ Military', badge: '#60a5fa' };
-      const icao = flight.match(/^([A-Z]{3})\d/)?.[1];
-      if (icao && FOREIGN_ICAO.has(icao)) return { label: '🌍 Intl', badge: '#34d399' };
-      return null;
-    }
-
-    // Single adsb.fi fetch feeds both On Approach and Interesting Flights
-    async function loadLiveFlights() {
-      document.getElementById("flights-live").innerHTML = `<div class="loading">Loading...</div>`;
-      document.getElementById("flights-interesting").innerHTML = `<div class="loading">Loading...</div>`;
+    async function loadApproach() {
+      document.getElementById('flights-live').innerHTML = '<div class="loading">Loading...</div>';
       try {
         const res = await fetch('/proxy/approach');
         const data = await res.json();
-        const all = (data.aircraft || []).filter(a => a.flight && a.flight.trim());
-
-        // On Approach: descending, low altitude, close to AUS
-        const approaching = all
-          .filter(a => typeof a.alt_baro === 'number' && a.alt_baro < 15000 && a.baro_rate && a.baro_rate < -300)
+        const planes = (data.aircraft || [])
+          .filter(a => a.flight && a.flight.trim() && typeof a.alt_baro === 'number' && a.alt_baro < 15000 && a.baro_rate && a.baro_rate < -300)
           .sort((a, b) => a.alt_baro - b.alt_baro)
           .slice(0, 8);
 
-        if (approaching.length === 0) {
-          document.getElementById("flights-live").innerHTML =
-            `<div style="color:#555;font-size:.85rem">No traffic on approach right now</div>`;
-        } else {
-          document.getElementById("flights-live").innerHTML = approaching.map(a => {
-            const altFt = Math.round(a.alt_baro).toLocaleString();
-            const typecode = a.t || '—';
-            const isWide = a.t && WIDEBODY_TYPES.has(a.t);
-            return `
-              <div class="flight-row">
-                <div class="flight-callsign">${a.flight.trim()}</div>
-                <div class="flight-info">${altFt} ft</div>
-                <div class="flight-type ${isWide ? 'widebody' : ''}">${isWide ? '🛫 ' : ''}${typecode}</div>
-              </div>`;
-          }).join('');
+        if (planes.length === 0) {
+          document.getElementById('flights-live').innerHTML =
+            '<div style="color:#555;font-size:.85rem">No traffic on approach right now</div>';
+          return;
         }
-
-        // Interesting Flights: military, gov, foreign, emergency
-        const interesting = all
-          .map(a => ({ a, cls: classifyFlight(a) }))
-          .filter(({ cls }) => cls !== null)
-          .slice(0, 8);
-
-        if (interesting.length === 0) {
-          document.getElementById("flights-interesting").innerHTML =
-            `<div style="color:#555;font-size:.85rem">Nothing unusual in the area right now</div>`;
-        } else {
-          document.getElementById("flights-interesting").innerHTML = interesting.map(({ a, cls }) => {
-            const altFt = typeof a.alt_baro === 'number' ? Math.round(a.alt_baro).toLocaleString() + ' ft' : 'Ground';
-            return `
-              <div class="flight-row">
-                <div class="flight-callsign">${a.flight.trim()}</div>
-                <div class="flight-info">${altFt}</div>
-                <div class="flight-type" style="background:${cls.badge}22;color:${cls.badge};font-weight:600">${cls.label}</div>
-              </div>`;
-          }).join('');
-        }
+        document.getElementById('flights-live').innerHTML = planes.map(a => {
+          const isWide = a.t && WIDEBODY_TYPES.has(a.t);
+          return `
+            <div class="flight-row">
+              <div class="flight-callsign">${a.flight.trim()}</div>
+              <div class="flight-info">${Math.round(a.alt_baro).toLocaleString()} ft</div>
+              <div class="flight-type ${isWide ? 'widebody' : ''}">${isWide ? '🛫 ' : ''}${a.t || '—'}</div>
+            </div>`;
+        }).join('');
       } catch (e) {
-        document.getElementById("flights-live").innerHTML = `<div class="error">Could not load</div>`;
-        document.getElementById("flights-interesting").innerHTML = `<div class="error">Could not load</div>`;
+        document.getElementById('flights-live').innerHTML = '<div class="error">Could not load</div>';
       }
     }
 
-    // Widebody Arrivals Today — AviationStack schedule, proxied + cached 8hrs in worker
-    async function loadArrivalSchedule() {
-      document.getElementById("flights-wide").innerHTML = `<div class="loading">Loading...</div>`;
-      try {
-        const res = await fetch('/proxy/aus-schedule');
-        const data = await res.json();
-        const flights = (data.data || [])
-          .filter(f => {
-            const iata = f.aircraft?.iata;
-            const icao = f.aircraft?.icao;
-            return (iata && WIDEBODY_IATA.has(iata)) || (icao && WIDEBODY_TYPES.has(icao));
-          })
-          .sort((a, b) => {
-            const ta = a.arrival?.scheduled ? new Date(a.arrival.scheduled) : Infinity;
-            const tb = b.arrival?.scheduled ? new Date(b.arrival.scheduled) : Infinity;
-            return ta - tb;
-          });
+    // International widebody tracker — callsign lookup via adsb.fi
+    const AUS_LAT = 30.1975, AUS_LON = -97.6664;
 
-        if (flights.length === 0) {
-          document.getElementById("flights-wide").innerHTML =
-            `<div style="color:#555;font-size:.85rem">No widebody arrivals scheduled today</div>`;
-          return;
+    function distNm(lat1, lon1, lat2, lon2) {
+      const R = 3440.065;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    }
+
+    const INTL_FLIGHTS = [
+      { airline: 'Lufthansa',      iata: 'LH441',  callsign: 'DLH441', type: 'B787', origin: 'Frankfurt' },
+      { airline: 'KLM',            iata: 'KL663',  callsign: 'KLM663', type: 'B787', origin: 'Amsterdam' },
+      { airline: 'British Airways',iata: 'BA192',  callsign: 'BAW192', type: 'A350', origin: 'London'    },
+    ];
+
+    async function loadIntlArrivals() {
+      document.getElementById('flights-wide').innerHTML = '<div class="loading">Loading...</div>';
+      const results = await Promise.all(INTL_FLIGHTS.map(async f => {
+        try {
+          const res = await fetch(`/proxy/callsign/${f.callsign}`);
+          const data = await res.json();
+          const ac = (data.aircraft || [])[0];
+          if (!ac || !ac.lat) return { ...f, status: 'nottracked' };
+          const dist = distNm(ac.lat, ac.lon, AUS_LAT, AUS_LON);
+          const gs = ac.gs || 480;
+          const eta = new Date(Date.now() + (dist / gs) * 3600000)
+            .toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Chicago' });
+          const onGround = ac.alt_baro === 'ground' || (typeof ac.alt_baro === 'number' && ac.alt_baro < 2000 && dist < 15);
+          return { ...f, status: onGround ? 'landed' : 'enroute', dist: Math.round(dist), eta };
+        } catch { return { ...f, status: 'nottracked' }; }
+      }));
+
+      document.getElementById('flights-wide').innerHTML = results.map(f => {
+        let badge, detail;
+        if (f.status === 'enroute') {
+          badge = `<span style="color:#facc15;font-size:.78rem;font-weight:600">En Route</span>`;
+          detail = `ETA ~${f.eta} &middot; ${f.dist} nm out`;
+        } else if (f.status === 'landed') {
+          badge = `<span style="color:#4ade80;font-size:.78rem;font-weight:600">Landed</span>`;
+          detail = f.origin;
+        } else {
+          badge = `<span style="color:#555;font-size:.78rem">Not yet airborne</span>`;
+          detail = f.origin;
         }
-
-        const rows = flights.map(f => {
-          const time = f.arrival?.scheduled
-            ? new Date(f.arrival.scheduled).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Chicago' })
-            : '—';
-          const flightNum = f.flight?.iata || '—';
-          const airline = f.airline?.name || '—';
-          const type = f.aircraft?.iata || f.aircraft?.icao || '—';
-          return `
-            <div class="flight-row">
-              <div class="flight-time" style="min-width:60px;color:#aaa">${time}</div>
-              <div class="flight-callsign">${flightNum}</div>
-              <div class="flight-info">${airline}</div>
-              <div class="flight-type widebody">🛫 ${type}</div>
-            </div>`;
-        }).join('');
-        document.getElementById("flights-wide").innerHTML = rows;
-      } catch (e) {
-        document.getElementById("flights-wide").innerHTML = `<div class="error">Could not load</div>`;
-      }
+        return `
+          <div class="flight-row" style="align-items:flex-start;padding:10px 0">
+            <div style="flex:1">
+              <div class="flight-callsign">${f.airline} <span style="color:#555;font-weight:400">${f.iata}</span></div>
+              <div style="font-size:.75rem;color:#555;margin-top:3px">${detail}</div>
+            </div>
+            <div style="text-align:right">
+              ${badge}
+              <div style="font-size:.72rem;color:#444;margin-top:2px">${f.type}</div>
+            </div>
+          </div>`;
+      }).join('');
     }
 
     // ── Traffic ──
@@ -1074,8 +1018,8 @@
 
     loadWeather();
     loadTraffic();
-    loadLiveFlights();
-    loadArrivalSchedule();
+    loadApproach();
+    loadIntlArrivals();
     loadTeam();
     loadSchedule();
     loadRanking();
