@@ -833,16 +833,35 @@
     async function loadFootballCompact() {
       const el = document.getElementById('secondary-sport-card');
       try {
-        // Explicitly request last completed football season (Aug-Dec season spans two years)
         const fbSeason = new Date().getMonth() < 7 ? new Date().getFullYear() - 1 : new Date().getFullYear();
-        const schedRes = await fetch(`https://site.api.espn.com/apis/site/v2/sports/football/college-football/teams/${TEXAS_FB_ID}/schedule?season=${fbSeason}`);
-        const schedData = await schedRes.json();
+        const nextSeason = fbSeason + 1;
+        const [schedRes, nextRes] = await Promise.all([
+          fetch(`https://site.api.espn.com/apis/site/v2/sports/football/college-football/teams/${TEXAS_FB_ID}/schedule?season=${fbSeason}`),
+          fetch(`https://site.api.espn.com/apis/site/v2/sports/football/college-football/teams/${TEXAS_FB_ID}/schedule?season=${nextSeason}`)
+        ]);
+        const [schedData, nextData] = await Promise.all([schedRes.json(), nextRes.json()]);
         const { record, lastResult } = compactFromSchedule(schedData.events || [], TEXAS_FB_ID);
+
+        // Countdown to next season opener
+        const nextEvents = (nextData.events || []).sort((a, b) => new Date(a.date) - new Date(b.date));
+        const opener = nextEvents[0];
+        let countdownHTML = '';
+        if (opener) {
+          const days = Math.ceil((new Date(opener.date) - new Date()) / 86400000);
+          const comp = opener.competitions?.[0];
+          const isHome = comp?.competitors?.find(c => c.homeAway === 'home')?.team?.id === TEXAS_FB_ID;
+          const opp = comp?.competitors?.find(c => c.team?.id !== TEXAS_FB_ID);
+          const oppName = opp?.team?.shortDisplayName || opp?.team?.displayName || '';
+          const openerDesc = oppName ? ` ${isHome ? 'vs' : '@'} ${oppName}` : '';
+          countdownHTML = `<div style="font-size:.83rem;color:#888"><span style="color:#bf5700;font-weight:700">${days}d</span> to opener${openerDesc}</div>`;
+        }
+
         el.innerHTML = `
           <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
             <div style="font-size:.9rem;font-weight:700;color:#bf5700">🏈 Football</div>
-            <div style="font-size:.83rem;color:#888">Season: <span style="color:#ddd;font-weight:600">${record}</span></div>
-            <div style="font-size:.83rem;color:#888;margin-left:auto">Last: <span style="color:#ddd">${lastResult}</span></div>
+            <div style="font-size:.83rem;color:#888">${fbSeason}: <span style="color:#ddd;font-weight:600">${record}</span></div>
+            <div style="font-size:.83rem;color:#888">Last: <span style="color:#ddd">${lastResult}</span></div>
+            <div style="margin-left:auto">${countdownHTML}</div>
           </div>`;
       } catch (e) { el.innerHTML = '<div class="error">Could not load football</div>'; }
     }
