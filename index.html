@@ -798,6 +798,19 @@
       } catch (e) {}
     }
 
+    function compactLastResult(events, teamId) {
+      const past = events.filter(e => new Date(e.date) <= new Date()).reverse();
+      if (!past.length) return 'No results yet';
+      const comp = past[0].competitions?.[0];
+      const texas = comp?.competitors?.find(c => c.team?.id === teamId);
+      const opp = comp?.competitors?.find(c => c.team?.id !== teamId);
+      const txScore = texas?.score?.displayValue ?? texas?.score ?? '?';
+      const oppScore = opp?.score?.displayValue ?? opp?.score ?? '?';
+      const won = parseInt(txScore) > parseInt(oppScore);
+      const oppName = opp?.team?.shortDisplayName || opp?.team?.displayName || '?';
+      return `${won ? 'W' : 'L'} ${txScore}–${oppScore} vs ${oppName}`;
+    }
+
     async function loadFootballCompact() {
       const el = document.getElementById('secondary-sport-card');
       try {
@@ -808,22 +821,12 @@
         const teamData = await teamRes.json();
         const schedData = await schedRes.json();
         const record = teamData.team?.record?.items?.[0]?.summary || '—';
-        const now = new Date();
-        const next = (schedData.events || []).find(e => new Date(e.date) > now);
-        let nextStr = 'Schedule TBD';
-        if (next) {
-          const comp = next.competitions?.[0];
-          const isHome = comp?.competitors?.find(c => c.homeAway === 'home')?.team?.id === TEXAS_FB_ID;
-          const opp = comp?.competitors?.find(c => c.team?.id !== TEXAS_FB_ID);
-          const oppName = opp?.team?.shortDisplayName || opp?.team?.displayName || '?';
-          const d = new Date(next.date);
-          nextStr = `${fmt(d)} ${isHome ? 'vs' : '@'} ${oppName}`;
-        }
+        const lastResult = compactLastResult(schedData.events || [], TEXAS_FB_ID);
         el.innerHTML = `
           <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
             <div style="font-size:.9rem;font-weight:700;color:#bf5700">🏈 Football</div>
-            <div style="font-size:.83rem;color:#888">Record <span style="color:#ddd;font-weight:600">${record}</span></div>
-            <div style="font-size:.83rem;color:#888;margin-left:auto">Next: <span style="color:#ddd">${nextStr}</span></div>
+            <div style="font-size:.83rem;color:#888">Season: <span style="color:#ddd;font-weight:600">${record}</span></div>
+            <div style="font-size:.83rem;color:#888;margin-left:auto">Last: <span style="color:#ddd">${lastResult}</span></div>
           </div>`;
       } catch (e) { el.innerHTML = '<div class="error">Could not load football</div>'; }
     }
@@ -838,22 +841,12 @@
         const teamData = await teamRes.json();
         const schedData = await schedRes.json();
         const record = teamData.team?.record?.items?.[0]?.summary || '—';
-        const now = new Date();
-        const next = (schedData.events || []).find(e => new Date(e.date) > now);
-        let nextStr = 'Schedule TBD';
-        if (next) {
-          const comp = next.competitions?.[0];
-          const isHome = comp?.competitors?.find(c => c.homeAway === 'home')?.team?.id === TEXAS_ID;
-          const opp = comp?.competitors?.find(c => c.team?.id !== TEXAS_ID);
-          const oppName = opp?.team?.shortDisplayName || opp?.team?.displayName || '?';
-          const d = new Date(next.date);
-          nextStr = `${fmt(d)} ${isHome ? 'vs' : '@'} ${oppName}`;
-        }
+        const lastResult = compactLastResult(schedData.events || [], TEXAS_ID);
         el.innerHTML = `
           <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
             <div style="font-size:.9rem;font-weight:700;color:#bf5700">⚾ Baseball</div>
-            <div style="font-size:.83rem;color:#888">Record <span style="color:#ddd;font-weight:600">${record}</span></div>
-            <div style="font-size:.83rem;color:#888;margin-left:auto">Next: <span style="color:#ddd">${nextStr}</span></div>
+            <div style="font-size:.83rem;color:#888">Season: <span style="color:#ddd;font-weight:600">${record}</span></div>
+            <div style="font-size:.83rem;color:#888;margin-left:auto">Last: <span style="color:#ddd">${lastResult}</span></div>
           </div>`;
       } catch (e) { el.innerHTML = '<div class="error">Could not load baseball</div>'; }
     }
