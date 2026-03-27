@@ -837,7 +837,7 @@
         const nextSeason = fbSeason + 1;
         const [schedRes, nextRes] = await Promise.all([
           fetch(`https://site.api.espn.com/apis/site/v2/sports/football/college-football/teams/${TEXAS_FB_ID}/schedule?season=${fbSeason}`),
-          fetch(`https://site.api.espn.com/apis/site/v2/sports/football/college-football/teams/${TEXAS_FB_ID}/schedule?season=${nextSeason}`)
+          fetch(`https://site.api.espn.com/apis/site/v2/sports/football/college-football/teams/${TEXAS_FB_ID}/schedule?season=${nextSeason}&seasontype=2`)
         ]);
         const [schedData, nextData] = await Promise.all([schedRes.json(), nextRes.json()]);
         const { record, lastResult } = compactFromSchedule(schedData.events || [], TEXAS_FB_ID);
