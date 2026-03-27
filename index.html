@@ -854,6 +854,12 @@
           const oppName = opp?.team?.shortDisplayName || opp?.team?.displayName || '';
           const openerDesc = oppName ? ` ${isHome ? 'vs' : '@'} ${oppName}` : '';
           countdownHTML = `<div style="font-size:.83rem;color:#888"><span style="color:#bf5700;font-weight:700">${days}d</span> to opener${openerDesc}</div>`;
+        } else {
+          // Schedule not published yet — estimate first Saturday of September
+          const est = new Date(nextSeason, 8, 1); // Sep 1
+          est.setDate(est.getDate() + ((6 - est.getDay() + 7) % 7)); // advance to Saturday
+          const days = Math.ceil((est - new Date()) / 86400000);
+          countdownHTML = `<div style="font-size:.83rem;color:#888"><span style="color:#bf5700;font-weight:700">~${days}d</span> to season opener</div>`;
         }
 
         el.innerHTML = `
