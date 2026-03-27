@@ -944,9 +944,9 @@
     }
 
     const INTL_FLIGHTS = [
-      { airline: 'Lufthansa',      iata: 'LH441',  callsign: 'DLH441', type: 'B787', origin: 'Frankfurt' },
-      { airline: 'KLM',            iata: 'KL663',  callsign: 'KLM663', type: 'B787', origin: 'Amsterdam' },
-      { airline: 'British Airways',iata: 'BA192',  callsign: 'BAW192', type: 'A350', origin: 'London'    },
+      { airline: 'Lufthansa',      iata: 'LH441',  callsign: 'DLH441', type: 'Boeing 787',  origin: 'Frankfurt' },
+      { airline: 'KLM',            iata: 'KL663',  callsign: 'KLM663', type: 'Boeing 787',  origin: 'Amsterdam' },
+      { airline: 'British Airways',iata: 'BA192',  callsign: 'BAW192', type: 'Airbus A350', origin: 'London'    },
     ];
 
     async function loadIntlArrivals() {
@@ -962,7 +962,7 @@
           const eta = new Date(Date.now() + (dist / gs) * 3600000)
             .toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Chicago' });
           const onGround = ac.alt_baro === 'ground' || (typeof ac.alt_baro === 'number' && ac.alt_baro < 2000 && dist < 15);
-          return { ...f, status: onGround ? 'landed' : 'enroute', dist: Math.round(dist), eta };
+          return { ...f, status: onGround ? 'landed' : 'enroute', dist: Math.round(dist), eta, acT: ac.t, acDesc: ac.desc };
         } catch { return { ...f, status: 'nottracked' }; }
       }));
 
@@ -986,7 +986,7 @@
             </div>
             <div style="text-align:right">
               ${badge}
-              <div style="font-size:.72rem;color:#444;margin-top:2px">${f.type}</div>
+              <div style="font-size:.72rem;color:#444;margin-top:2px">${f.acT ? fmtAircraftType(f.acT, f.acDesc) : f.type}</div>
             </div>
           </div>`;
       }).join('');
