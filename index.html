@@ -798,17 +798,36 @@
       } catch (e) {}
     }
 
-    function compactLastResult(events, teamId) {
-      const past = events.filter(e => new Date(e.date) <= new Date()).reverse();
-      if (!past.length) return 'No results yet';
-      const comp = past[0].competitions?.[0];
-      const texas = comp?.competitors?.find(c => c.team?.id === teamId);
-      const opp = comp?.competitors?.find(c => c.team?.id !== teamId);
-      const txScore = texas?.score?.displayValue ?? texas?.score ?? '?';
-      const oppScore = opp?.score?.displayValue ?? opp?.score ?? '?';
-      const won = parseInt(txScore) > parseInt(oppScore);
-      const oppName = opp?.team?.shortDisplayName || opp?.team?.displayName || '?';
-      return `${won ? 'W' : 'L'} ${txScore}–${oppScore} vs ${oppName}`;
+    function compactFromSchedule(events, teamId) {
+      // Only completed games, sorted most-recent-first
+      const completed = events
+        .filter(e => e.competitions?.[0]?.status?.type?.completed === true)
+        .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+      // Record from schedule data
+      let wins = 0;
+      completed.forEach(e => {
+        const comp = e.competitions?.[0];
+        const texas = comp?.competitors?.find(c => c.team?.id === teamId);
+        const opp = comp?.competitors?.find(c => c.team?.id !== teamId);
+        if (parseInt(texas?.score?.displayValue ?? texas?.score ?? 0) > parseInt(opp?.score?.displayValue ?? opp?.score ?? 0)) wins++;
+      });
+      const record = completed.length ? `${wins}-${completed.length - wins}` : '—';
+
+      // Last game
+      let lastResult = 'No results yet';
+      if (completed.length) {
+        const comp = completed[0].competitions?.[0];
+        const texas = comp?.competitors?.find(c => c.team?.id === teamId);
+        const opp = comp?.competitors?.find(c => c.team?.id !== teamId);
+        const txScore = texas?.score?.displayValue ?? texas?.score ?? '?';
+        const oppScore = opp?.score?.displayValue ?? opp?.score ?? '?';
+        const won = parseInt(txScore) > parseInt(oppScore);
+        const oppName = opp?.team?.shortDisplayName || opp?.team?.displayName || '?';
+        lastResult = `${won ? 'W' : 'L'} ${txScore}–${oppScore} vs ${oppName}`;
+      }
+
+      return { record, lastResult };
     }
 
     async function loadFootballCompact() {
@@ -816,14 +835,9 @@
       try {
         // Explicitly request last completed football season (Aug-Dec season spans two years)
         const fbSeason = new Date().getMonth() < 7 ? new Date().getFullYear() - 1 : new Date().getFullYear();
-        const [teamRes, schedRes] = await Promise.all([
-          fetch(`https://site.api.espn.com/apis/site/v2/sports/football/college-football/teams/${TEXAS_FB_ID}`),
-          fetch(`https://site.api.espn.com/apis/site/v2/sports/football/college-football/teams/${TEXAS_FB_ID}/schedule?season=${fbSeason}`)
-        ]);
-        const teamData = await teamRes.json();
+        const schedRes = await fetch(`https://site.api.espn.com/apis/site/v2/sports/football/college-football/teams/${TEXAS_FB_ID}/schedule?season=${fbSeason}`);
         const schedData = await schedRes.json();
-        const record = teamData.team?.record?.items?.[0]?.summary || '—';
-        const lastResult = compactLastResult(schedData.events || [], TEXAS_FB_ID);
+        const { record, lastResult } = compactFromSchedule(schedData.events || [], TEXAS_FB_ID);
         el.innerHTML = `
           <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
             <div style="font-size:.9rem;font-weight:700;color:#bf5700">🏈 Football</div>
@@ -836,14 +850,12 @@
     async function loadBaseballCompact() {
       const el = document.getElementById('secondary-sport-card');
       try {
-        const [teamRes, schedRes] = await Promise.all([
+        const [, schedRes] = await Promise.all([
           fetch(`https://site.api.espn.com/apis/site/v2/sports/baseball/college-baseball/teams/${TEXAS_ID}`),
           fetch(`https://site.api.espn.com/apis/site/v2/sports/baseball/college-baseball/teams/${TEXAS_ID}/schedule`)
         ]);
-        const teamData = await teamRes.json();
         const schedData = await schedRes.json();
-        const record = teamData.team?.record?.items?.[0]?.summary || '—';
-        const lastResult = compactLastResult(schedData.events || [], TEXAS_ID);
+        const { record, lastResult } = compactFromSchedule(schedData.events || [], TEXAS_ID);
         el.innerHTML = `
           <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
             <div style="font-size:.9rem;font-weight:700;color:#bf5700">⚾ Baseball</div>
