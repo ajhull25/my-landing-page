@@ -1011,20 +1011,29 @@
       95: ["⛈️","Thunderstorm"], 96: ["⛈️","Thunderstorm"], 99: ["⛈️","Thunderstorm"],
     };
 
-    function wmo(code) { return WMO[code] || ["🌡️", "Unknown"]; }
+    function wmo(code, isDay = true) {
+      const entry = WMO[code] || ["🌡️", "Unknown"];
+      if (isDay) return entry;
+      // Night overrides for clear/partly-cloudy codes
+      const nightMap = { "☀️": "🌙", "🌤️": "🌙", "⛅": "☁️" };
+      const nightEmoji = nightMap[entry[0]] || entry[0];
+      return [nightEmoji, entry[1]];
+    }
 
     async function loadWeather() {
       try {
         const res = await fetch(
           "https://api.open-meteo.com/v1/forecast?latitude=30.2672&longitude=-97.7431" +
           "&current=temperature_2m,weathercode,windspeed_10m,relative_humidity_2m" +
-          "&daily=temperature_2m_max,temperature_2m_min,weathercode,precipitation_probability_max" +
+          "&daily=temperature_2m_max,temperature_2m_min,weathercode,precipitation_probability_max,sunrise,sunset" +
           "&temperature_unit=fahrenheit&timezone=America%2FChicago&forecast_days=4"
         );
         const d = await res.json();
         const cur = d.current;
         const daily = d.daily;
-        const [emoji, desc] = wmo(cur.weathercode);
+        const now = Date.now();
+        const isDay = now >= new Date(daily.sunrise[0]).getTime() && now < new Date(daily.sunset[0]).getTime();
+        const [emoji, desc] = wmo(cur.weathercode, isDay);
 
         const forecastHTML = daily.time.slice(1).map((date, i) => {
           const day = new Date(date + "T12:00:00").toLocaleDateString("en-US", { weekday: "short" });
